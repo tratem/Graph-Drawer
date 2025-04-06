@@ -1,0 +1,3 @@
+[submodule "CustomWidgets"]
+	path = CustomWidgets
+	url = https://github.com/tratem/CustomWidgets.git
