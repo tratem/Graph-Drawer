@@ -1,7 +1,7 @@
 import csv
 import sys
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QListWidget, QListWidgetItem,
-                             QVBoxLayout, QHBoxLayout)
+                             QVBoxLayout, QHBoxLayout, QFileDialog)
 from PyQt5.QtCore import QSettings, Qt
 from CustomWidgets import custom_widgets as CW
 
@@ -52,7 +52,13 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(plot_button)
 
     def choose_file_clicked(self):
-        pass
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Open File", "", "(*.csv)"
+        )
+        if file_name:
+            self.selected_file.setText(f"{file_name}")
+        
+        
     
     def handle_axis_type_change(self, index):
         if index == 0:
