@@ -1,7 +1,6 @@
 import csv
-import sys
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QListWidget, QListWidgetItem,
-                             QVBoxLayout, QHBoxLayout, QFileDialog)
+                             QVBoxLayout, QHBoxLayout, QFileDialog, QAbstractItemView)
 from PyQt5.QtCore import QSettings, Qt
 from CustomWidgets import custom_widgets as CW
 
@@ -10,66 +9,85 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setGeometry(100, 100, 500, 800)
         self.setWindowTitle("Graph Drawer")
+
+        self.columns = []
+        self.configurations = QSettings("GD", "GraphDrawer")
+        self.selected_file = None
+
         self.init_UI()
 
     def init_UI(self):
         main_layout = QVBoxLayout()
-        file_select_layout = QHBoxLayout() # selected file and select file button
-        self.axis_dependant_layout = QVBoxLayout() # content change dependant on axis_type_combo selection
+        file_select_layout = QHBoxLayout()
+        self.axis_dependant_layout = QVBoxLayout()
 
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
         program_name = CW.create_label("Graph Drawer", text_size=25)
-        main_layout.addWidget(program_name, alignment= Qt.AlignCenter)
+        main_layout.addWidget(program_name, alignment=Qt.AlignCenter)
 
         selected_file_text = CW.create_label("Selected File:")
         file_select_layout.addWidget(selected_file_text)
-        self.selected_file = CW.create_label("No file selected")
-        file_select_layout.addWidget(self.selected_file)
+        self.selected_file_name = CW.create_label("No file selected")
+        file_select_layout.addWidget(self.selected_file_name)
         choose_file_button = CW.create_button("Choose File")
         choose_file_button.clicked.connect(self.choose_file_clicked)
         file_select_layout.addWidget(choose_file_button)
 
         main_layout.addLayout(file_select_layout)
 
-        graph_title = CW.create_line_edit("Graph Title..")
-        main_layout.addWidget(graph_title)
+        self.graph_title = CW.create_line_edit("Graph Title..")
+        main_layout.addWidget(self.graph_title)
 
-        x_axis_title = CW.create_line_edit("X axis Title...")
-        main_layout.addWidget(x_axis_title)
+        self.x_axis_title = CW.create_line_edit("X axis Title...")
+        main_layout.addWidget(self.x_axis_title)
 
-        axis_type_combo = CW.create_combo_box(["Single y axis", "Dual y axis"])
-        axis_type_combo.currentIndexChanged.connect(self.handle_axis_type_change)
-        self.handle_single_axis_selection() #Set single as initial config
-        main_layout.addWidget(axis_type_combo)
+        self.axis_type_combo = CW.create_combo_box(["Single y axis", "Dual y axis"])
+        self.axis_type_combo.currentIndexChanged.connect(self.handle_axis_type_change)
+        main_layout.addWidget(self.axis_type_combo)
 
         main_layout.addLayout(self.axis_dependant_layout)
+
+        self.handle_single_axis_selection()
 
         plot_button = CW.create_button("PLOT", "black", "lime")
         plot_button.clicked.connect(self.handle_plot_button_click)
         main_layout.addWidget(plot_button)
 
     def choose_file_clicked(self):
-        file_name, _ = QFileDialog.getOpenFileName(
-            self, "Open File", "", "(*.csv)"
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open File", "", "CSV Files (*.csv)"
         )
-        if file_name:
-            self.selected_file.setText(f"{file_name}")
-        
-        
-    
+        if file_path:
+            self.selected_file_name.setText(file_path)
+            with open(file_path, newline='', encoding='utf-8') as csvfile:
+                self.selected_file = csv.reader(csvfile)
+                self.columns = next(self.selected_file)
+
+            self.populate_items_list()
+
+            if self.axis_type_combo.currentIndex() == 0:
+                self.load_single_axis_selection()
+            else:
+                self.load_dual_axis_selection()
+
     def handle_axis_type_change(self, index):
         if index == 0:
             self.handle_single_axis_selection()
+            self.populate_items_list()
+            self.load_single_axis_selection()
         else:
             self.handle_dual_axis_selection()
+            self.populate_items_list()
+            self.load_dual_axis_selection()
 
     def handle_single_axis_selection(self):
         '''Change layout when single axis is selected'''
         CW.clear_layout(self.axis_dependant_layout)
         self.left_y_items_list = QListWidget()
+        self.left_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
         self.left_y_axis_label_line_edit = CW.create_line_edit("Left y axis label..")
         self.axis_dependant_layout.addWidget(self.left_y_items_list)
         self.axis_dependant_layout.addWidget(self.left_y_axis_label_line_edit)
@@ -77,17 +95,19 @@ class MainWindow(QMainWindow):
     def handle_dual_axis_selection(self):
         '''Change layout when dual axis is selected'''
         CW.clear_layout(self.axis_dependant_layout)
+
         dual_axis_layout = QHBoxLayout()
         left_axis_layout = QVBoxLayout()
         right_axis_layout = QVBoxLayout()
 
         self.left_y_items_list = QListWidget()
+        self.left_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
         self.left_y_axis_label_line_edit = CW.create_line_edit("Left y axis label..")
         left_axis_layout.addWidget(self.left_y_items_list)
         left_axis_layout.addWidget(self.left_y_axis_label_line_edit)
 
-        
         self.right_y_items_list = QListWidget()
+        self.right_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
         self.right_y_axis_label_line_edit = CW.create_line_edit("Right y axis label..")
         right_axis_layout.addWidget(self.right_y_items_list)
         right_axis_layout.addWidget(self.right_y_axis_label_line_edit)
@@ -97,5 +117,78 @@ class MainWindow(QMainWindow):
 
         self.axis_dependant_layout.addLayout(dual_axis_layout)
 
+    def populate_items_list(self):
+        self.left_y_items_list.clear()
+        if hasattr(self, 'right_y_items_list'):
+            self.right_y_items_list.clear()
+
+        for header in self.columns:
+            item = QListWidgetItem(header)
+            self.left_y_items_list.addItem(item)
+
+            if "Dual" in self.axis_type_combo.currentText():
+                right_item = QListWidgetItem(header)
+                self.right_y_items_list.addItem(right_item)
+
     def handle_plot_button_click(self):
-        '''Show Figure'''
+        '''Plotting feature placeholder'''
+        print("Plot button clicked!")
+
+    def save_single_axis_selection(self):
+        selected_texts = [item.text() for item in self.left_y_items_list.selectedItems()]
+        self.configurations.setValue("SingleSelections", selected_texts)
+        self.configurations.setValue("SingleLeftAxisLabel", self.left_y_axis_label_line_edit.text())
+
+    def load_single_axis_selection(self):
+        label_text = self.configurations.value("SingleLeftAxisLabel", "")
+        self.left_y_axis_label_line_edit.setText(label_text)
+
+        selected_texts = self.configurations.value("SingleSelections", [])
+        if isinstance(selected_texts, str):
+            selected_texts = [selected_texts]
+
+        for i in range(self.left_y_items_list.count()):
+            item = self.left_y_items_list.item(i)
+            if item.text() in selected_texts:
+                item.setSelected(True)
+
+    def save_dual_axis_selection(self):
+        left_selected = [item.text() for item in self.left_y_items_list.selectedItems()]
+        right_selected = [item.text() for item in self.right_y_items_list.selectedItems()]
+
+        self.configurations.setValue("LeftAxisSelections", left_selected)
+        self.configurations.setValue("LeftAxisLabel", self.left_y_axis_label_line_edit.text())
+        self.configurations.setValue("RightAxisSelections", right_selected)
+        self.configurations.setValue("RightAxisLabel", self.right_y_axis_label_line_edit.text())
+
+    def load_dual_axis_selection(self):
+        left_label = self.configurations.value("LeftAxisLabel", "")
+        right_label = self.configurations.value("RightAxisLabel", "")
+        self.left_y_axis_label_line_edit.setText(left_label)
+        self.right_y_axis_label_line_edit.setText(right_label)
+
+        left_selected_texts = self.configurations.value("LeftAxisSelections", [])
+        right_selected_texts = self.configurations.value("RightAxisSelections", [])
+
+        if isinstance(left_selected_texts, str):
+            left_selected_texts = [left_selected_texts]
+        if isinstance(right_selected_texts, str):
+            right_selected_texts = [right_selected_texts]
+
+        for i in range(self.left_y_items_list.count()):
+            item = self.left_y_items_list.item(i)
+            if item.text() in left_selected_texts:
+                item.setSelected(True)
+
+        for i in range(self.right_y_items_list.count()):
+            item = self.right_y_items_list.item(i)
+            if item.text() in right_selected_texts:
+                item.setSelected(True)
+
+    def closeEvent(self, event):
+        '''Save everything when app is closing'''
+        if self.axis_type_combo.currentIndex() == 0:
+            self.save_single_axis_selection()
+        else:
+            self.save_dual_axis_selection()
+        event.accept()
