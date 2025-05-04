@@ -1,4 +1,5 @@
 import csv
+import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QListWidget, QListWidgetItem,
                              QVBoxLayout, QHBoxLayout, QFileDialog, QAbstractItemView)
 from PyQt5.QtCore import QSettings, Qt
@@ -10,9 +11,8 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 500, 800)
         self.setWindowTitle("Graph Drawer")
 
-        self.columns = []
+        self.column_names = []
         self.configurations = QSettings("GD", "GraphDrawer")
-        self.selected_file = None
 
         self.init_UI()
 
@@ -63,8 +63,8 @@ class MainWindow(QMainWindow):
         if file_path:
             self.selected_file_name.setText(file_path)
             with open(file_path, newline='', encoding='utf-8') as csvfile:
-                self.selected_file = csv.reader(csvfile)
-                self.columns = next(self.selected_file)
+                selected_file = csv.reader(csvfile)
+                self.column_names = next(selected_file)
 
             self.populate_items_list()
 
@@ -122,7 +122,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'right_y_items_list'):
             self.right_y_items_list.clear()
 
-        for header in self.columns:
+        for header in self.column_names:
             item = QListWidgetItem(header)
             self.left_y_items_list.addItem(item)
 
@@ -131,8 +131,70 @@ class MainWindow(QMainWindow):
                 self.right_y_items_list.addItem(right_item)
 
     def handle_plot_button_click(self):
-        '''Plotting feature placeholder'''
-        print("Plot button clicked!")
+        '''Plotting feature'''
+        data = []
+
+        if self.selected_file_name.text() != "No file selected":
+            with open(self.selected_file_name.text(), newline='', encoding='utf-8') as csvfile:
+                reader = csv.reader(csvfile)
+                next(reader)  # Skip header
+                for row in reader:
+                    data.append(row)
+
+        if not data:
+            return
+
+        # Transpose rows to columns
+        columns_data = list(zip(*data))
+
+        # Convert columns to numeric where possible
+        numeric_columns = []
+        for col in columns_data:
+            try:
+                numeric_columns.append([int(value) for value in col])
+            except ValueError:
+                numeric_columns.append(col)  # Keep non-numeric columns
+
+        fig, ax1 = plt.subplots()
+
+        x_data = list(range(1, len(numeric_columns[0]) + 1)) # x_axis data
+
+        if self.axis_type_combo.currentText() == "Single y axis":
+            selected_items = self.left_y_items_list.selectedIndexes()
+            selected_columns = [item.row() for item in selected_items]
+
+            for idx in selected_columns:
+                y_data = numeric_columns[idx]
+
+                ax1.plot(x_data, y_data, label=self.column_names[idx])
+
+            ax1.set_ylabel(self.left_y_axis_label_line_edit.text())
+            ax1.set_xlabel(self.x_axis_title.text())
+
+        else:  # Dual y axis
+            selected_left = [item.row() for item in self.left_y_items_list.selectedIndexes()]
+            selected_right = [item.row() for item in self.right_y_items_list.selectedIndexes()]
+
+            ax2 = ax1.twinx()
+
+            for idx in selected_left:
+                y_data = numeric_columns[idx]
+
+                ax1.plot(x_data, y_data, label=self.column_names[idx])
+
+            for idx in selected_right:
+                y_data = numeric_columns[idx]
+
+                ax2.plot(x_data, y_data, label=self.column_names[idx])
+
+            ax1.set_ylabel(self.left_y_axis_label_line_edit.text())
+            ax2.set_ylabel(self.right_y_axis_label_line_edit.text())
+            ax1.set_xlabel(self.x_axis_title.text())
+
+        fig.suptitle(self.graph_title.text())
+        fig.legend()
+        plt.show()
+
 
     def save_single_axis_selection(self):
         selected_texts = [item.text() for item in self.left_y_items_list.selectedItems()]
@@ -186,9 +248,4 @@ class MainWindow(QMainWindow):
                 item.setSelected(True)
 
     def closeEvent(self, event):
-        '''Save everything when app is closing'''
-        if self.axis_type_combo.currentIndex() == 0:
-            self.save_single_axis_selection()
-        else:
-            self.save_dual_axis_selection()
         event.accept()
