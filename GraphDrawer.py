@@ -156,6 +156,10 @@ class MainWindow(QMainWindow):
                 numeric_columns.append(col)  # Keep non-numeric columns
 
         fig, ax1 = plt.subplots()
+        
+        # Default color list; needed so that in dual axis the colors don't reapet
+        color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        used_colors = []
 
         x_data = list(range(1, len(numeric_columns[0]) + 1)) # x_axis data
 
@@ -174,18 +178,24 @@ class MainWindow(QMainWindow):
         else:  # Dual y axis
             selected_left = [item.row() for item in self.left_y_items_list.selectedIndexes()]
             selected_right = [item.row() for item in self.right_y_items_list.selectedIndexes()]
-
             ax2 = ax1.twinx()
 
-            for idx in selected_left:
+            for i, idx in enumerate(selected_left):
+                y_data = numeric_columns[idx]
+                color = color_cycle[i % len(color_cycle)]
+                used_colors.append(color)
+
+                ax1.plot(x_data, y_data, label=self.column_names[idx], color=color)
+
+            # Prepare colors for right axis by skipping used ones
+            unused_colors = [c for c in color_cycle if c not in used_colors]
+            
+            for j,idx in enumerate(selected_right):
                 y_data = numeric_columns[idx]
 
-                ax1.plot(x_data, y_data, label=self.column_names[idx])
-
-            for idx in selected_right:
-                y_data = numeric_columns[idx]
-
-                ax2.plot(x_data, y_data, label=self.column_names[idx])
+                # Fallback to color cycle if we run out
+                color = unused_colors[j % len(unused_colors)] if j < len(unused_colors) else color_cycle[(len(used_colors) + j) % len(color_cycle)]
+                ax2.plot(x_data, y_data, label=self.column_names[idx], color= color)
 
             ax1.set_ylabel(self.left_y_axis_label_line_edit.text())
             ax2.set_ylabel(self.right_y_axis_label_line_edit.text())
