@@ -1,4 +1,4 @@
-import csv
+import pandas as pd
 import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QListWidget, QListWidgetItem,
                              QVBoxLayout, QHBoxLayout, QFileDialog, QAbstractItemView)
@@ -62,9 +62,8 @@ class MainWindow(QMainWindow):
         )
         if file_path:
             self.selected_file_name.setText(file_path)
-            with open(file_path, newline='', encoding='utf-8') as csvfile:
-                selected_file = csv.reader(csvfile)
-                self.column_names = next(selected_file)
+            selected_file = pd.read_csv(file_path, delimiter=',', decimal = '.', encoding='utf-8')
+            self.column_names = list(selected_file.columns)
 
             self.populate_items_list()
 
@@ -132,28 +131,7 @@ class MainWindow(QMainWindow):
 
     def handle_plot_button_click(self):
         '''Plotting feature'''
-        data = []
-
-        if self.selected_file_name.text() != "No file selected":
-            with open(self.selected_file_name.text(), newline='', encoding='utf-8') as csvfile:
-                reader = csv.reader(csvfile)
-                next(reader)  # Skip header
-                for row in reader:
-                    data.append(row)
-
-        if not data:
-            return
-
-        # Transpose rows to columns
-        columns_data = list(zip(*data))
-
-        # Convert columns to numeric where possible
-        numeric_columns = []
-        for col in columns_data:
-            try:
-                numeric_columns.append([int(value) for value in col])
-            except ValueError:
-                numeric_columns.append(col)  # Keep non-numeric columns
+        file_data = pd.read_csv(self.selected_file_name.text(), delimiter=',', decimal= '.', encoding= 'utf-8')
 
         fig, ax1 = plt.subplots()
         
@@ -161,50 +139,52 @@ class MainWindow(QMainWindow):
         color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
         used_colors = []
 
-        x_data = list(range(1, len(numeric_columns[0]) + 1)) # x_axis data
+        x_data = [x for x in range(len(file_data))] # x_axis data
 
         if self.axis_type_combo.currentText() == "Single y axis":
             selected_items = self.left_y_items_list.selectedIndexes()
-            selected_columns = [item.row() for item in selected_items]
+            selected_columns = [item.data() for item in selected_items]
 
             for idx in selected_columns:
-                y_data = numeric_columns[idx]
+                y_data = file_data[idx]
 
-                ax1.plot(x_data, y_data, label=self.column_names[idx])
+                ax1.plot(x_data, y_data, label=idx)
 
-            ax1.set_ylabel(self.left_y_axis_label_line_edit.text())
             ax1.set_xlabel(self.x_axis_title.text())
+            ax1.set_ylabel(self.left_y_axis_label_line_edit.text())
+            ax1.legend(loc= 'upper left')
 
         else:  # Dual y axis
-            selected_left = [item.row() for item in self.left_y_items_list.selectedIndexes()]
-            selected_right = [item.row() for item in self.right_y_items_list.selectedIndexes()]
+            selected_left = [item.data() for item in self.left_y_items_list.selectedIndexes()]
+            selected_right = [item.data() for item in self.right_y_items_list.selectedIndexes()]
             ax2 = ax1.twinx()
 
             for i, idx in enumerate(selected_left):
-                y_data = numeric_columns[idx]
+                y_data = file_data[idx]
                 color = color_cycle[i % len(color_cycle)]
                 used_colors.append(color)
 
-                ax1.plot(x_data, y_data, label=self.column_names[idx], color=color)
+                ax1.plot(x_data, y_data, label=idx, color=color)
 
             # Prepare colors for right axis by skipping used ones
             unused_colors = [c for c in color_cycle if c not in used_colors]
             
-            for j,idx in enumerate(selected_right):
-                y_data = numeric_columns[idx]
+            for j, idx in enumerate(selected_right):
+                y_data = file_data[idx]
 
                 # Fallback to color cycle if we run out
                 color = unused_colors[j % len(unused_colors)] if j < len(unused_colors) else color_cycle[(len(used_colors) + j) % len(color_cycle)]
-                ax2.plot(x_data, y_data, label=self.column_names[idx], color= color)
+                
+                ax2.plot(x_data, y_data, label=idx, color= color)
 
+            ax1.set_xlabel(self.x_axis_title.text())
             ax1.set_ylabel(self.left_y_axis_label_line_edit.text())
             ax2.set_ylabel(self.right_y_axis_label_line_edit.text())
-            ax1.set_xlabel(self.x_axis_title.text())
+            ax1.legend(loc= 'upper left')
+            ax2.legend(loc= 'upper right')
 
         fig.suptitle(self.graph_title.text())
-        fig.legend()
         plt.show()
-
 
     def save_single_axis_selection(self):
         selected_texts = [item.text() for item in self.left_y_items_list.selectedItems()]
