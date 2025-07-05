@@ -18,7 +18,6 @@ class MainWindow(QMainWindow):
 
     def init_UI(self):
         main_layout = QVBoxLayout()
-        file_select_layout = QHBoxLayout()
         self.axis_dependant_layout = QVBoxLayout()
 
         central_widget = QWidget()
@@ -26,7 +25,31 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
         program_name = CW.create_label("Graph Drawer", text_size=25)
-        main_layout.addWidget(program_name, alignment=Qt.AlignCenter)
+        main_layout.addWidget(program_name, alignment=Qt.AlignCenter)        
+
+        main_layout.addLayout(self.create_file_select_layout())
+        main_layout.addLayout(self.create_delimiter_decimal_layout())
+
+        self.graph_title = CW.create_line_edit("Graph Title..")
+        main_layout.addWidget(self.graph_title)
+
+        self.x_axis_title = CW.create_line_edit("X axis Title...")
+        main_layout.addWidget(self.x_axis_title)
+
+        self.axis_type_combo = CW.create_combo_box(["Single Y axis", "Dual Y axis"])
+        self.axis_type_combo.currentIndexChanged.connect(self.handle_axis_type_change)
+        main_layout.addWidget(self.axis_type_combo)
+
+        main_layout.addLayout(self.axis_dependant_layout)
+
+        self.handle_single_axis_selection()
+
+        plot_button = CW.create_button("Plot", "black", "lime")
+        plot_button.clicked.connect(self.handle_plot_button_click)
+        main_layout.addWidget(plot_button)
+
+    def create_file_select_layout(self) -> QHBoxLayout:
+        file_select_layout = QHBoxLayout()
 
         selected_file_text = CW.create_label("Selected File:")
         file_select_layout.addWidget(selected_file_text)
@@ -36,25 +59,17 @@ class MainWindow(QMainWindow):
         choose_file_button.clicked.connect(self.choose_file_clicked)
         file_select_layout.addWidget(choose_file_button)
 
-        main_layout.addLayout(file_select_layout)
+        return file_select_layout
+    
+    def create_delimiter_decimal_layout(self) -> QHBoxLayout:
+        delimiter_decimal_layout = QHBoxLayout()
 
-        self.graph_title = CW.create_line_edit("Graph Title..")
-        main_layout.addWidget(self.graph_title)
+        self.delimiter_line_edit = CW.create_line_edit("Delimiter (;)")
+        self.decimal_line_edit = CW.create_line_edit("Decimal (.)")
+        delimiter_decimal_layout.addWidget(self.delimiter_line_edit)
+        delimiter_decimal_layout.addWidget(self.decimal_line_edit)
 
-        self.x_axis_title = CW.create_line_edit("X axis Title...")
-        main_layout.addWidget(self.x_axis_title)
-
-        self.axis_type_combo = CW.create_combo_box(["Single y axis", "Dual y axis"])
-        self.axis_type_combo.currentIndexChanged.connect(self.handle_axis_type_change)
-        main_layout.addWidget(self.axis_type_combo)
-
-        main_layout.addLayout(self.axis_dependant_layout)
-
-        self.handle_single_axis_selection()
-
-        plot_button = CW.create_button("PLOT", "black", "lime")
-        plot_button.clicked.connect(self.handle_plot_button_click)
-        main_layout.addWidget(plot_button)
+        return delimiter_decimal_layout
 
     def choose_file_clicked(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -62,8 +77,24 @@ class MainWindow(QMainWindow):
         )
         if file_path:
             self.selected_file_name.setText(file_path)
-            selected_file = pd.read_csv(file_path, delimiter=',', decimal = '.', encoding='utf-8')
-            self.column_names = list(selected_file.columns)
+            
+            # Get delimiter and decimal input values
+            delimiter = self.delimiter_line_edit.text()
+            decimal = self.decimal_line_edit.text()
+
+            # Use defaults if inputs are empty
+            delimiter = delimiter if delimiter else ";"
+            decimal = decimal if decimal else "."
+
+            # Read the CSV file
+            self.selected_file = pd.read_csv(
+                file_path,
+                delimiter=delimiter,
+                decimal=decimal,
+                encoding='utf-8'
+            )
+            
+            self.column_names = list(self.selected_file.columns)
 
             self.populate_items_list()
 
@@ -78,16 +109,17 @@ class MainWindow(QMainWindow):
             self.populate_items_list()
             self.load_single_axis_selection()
         else:
+            self.save_single_axis_selection()
             self.handle_dual_axis_selection()
             self.populate_items_list()
-            self.load_dual_axis_selection()
+            self.load_single_axis_selection()
 
     def handle_single_axis_selection(self):
         '''Change layout when single axis is selected'''
         CW.clear_layout(self.axis_dependant_layout)
         self.left_y_items_list = QListWidget()
         self.left_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.left_y_axis_label_line_edit = CW.create_line_edit("Left y axis label..")
+        self.left_y_axis_label_line_edit = CW.create_line_edit("Left Y axis label..")
         self.axis_dependant_layout.addWidget(self.left_y_items_list)
         self.axis_dependant_layout.addWidget(self.left_y_axis_label_line_edit)
 
@@ -101,13 +133,13 @@ class MainWindow(QMainWindow):
 
         self.left_y_items_list = QListWidget()
         self.left_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.left_y_axis_label_line_edit = CW.create_line_edit("Left y axis label..")
+        self.left_y_axis_label_line_edit = CW.create_line_edit("Left Y axis label..")
         left_axis_layout.addWidget(self.left_y_items_list)
         left_axis_layout.addWidget(self.left_y_axis_label_line_edit)
 
         self.right_y_items_list = QListWidget()
         self.right_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.right_y_axis_label_line_edit = CW.create_line_edit("Right y axis label..")
+        self.right_y_axis_label_line_edit = CW.create_line_edit("Right Y axis label..")
         right_axis_layout.addWidget(self.right_y_items_list)
         right_axis_layout.addWidget(self.right_y_axis_label_line_edit)
 
@@ -131,22 +163,20 @@ class MainWindow(QMainWindow):
 
     def handle_plot_button_click(self):
         '''Plotting feature'''
-        file_data = pd.read_csv(self.selected_file_name.text(), delimiter=',', decimal= '.', encoding= 'utf-8')
-
         fig, ax1 = plt.subplots()
         
         # Default color list; needed so that in dual axis the colors don't reapet
         color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
         used_colors = []
 
-        x_data = [x for x in range(len(file_data))] # x_axis data
+        x_data = [x for x in range(len(self.selected_file))] # x_axis data
 
-        if self.axis_type_combo.currentText() == "Single y axis":
+        if self.axis_type_combo.currentText() == "Single Y axis":
             selected_items = self.left_y_items_list.selectedIndexes()
             selected_columns = [item.data() for item in selected_items]
 
             for idx in selected_columns:
-                y_data = file_data[idx]
+                y_data = self.selected_file[idx]
 
                 ax1.plot(x_data, y_data, label=idx)
 
@@ -160,7 +190,7 @@ class MainWindow(QMainWindow):
             ax2 = ax1.twinx()
 
             for i, idx in enumerate(selected_left):
-                y_data = file_data[idx]
+                y_data = self.selected_file[idx]
                 color = color_cycle[i % len(color_cycle)]
                 used_colors.append(color)
 
@@ -170,7 +200,7 @@ class MainWindow(QMainWindow):
             unused_colors = [c for c in color_cycle if c not in used_colors]
             
             for j, idx in enumerate(selected_right):
-                y_data = file_data[idx]
+                y_data = self.selected_file[idx]
 
                 # Fallback to color cycle if we run out
                 color = unused_colors[j % len(unused_colors)] if j < len(unused_colors) else color_cycle[(len(used_colors) + j) % len(color_cycle)]
