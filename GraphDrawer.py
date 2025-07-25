@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import csv
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QListWidget, QListWidgetItem,
                              QVBoxLayout, QHBoxLayout, QFileDialog, QAbstractItemView)
 from PyQt5.QtCore import QSettings, Qt
@@ -28,7 +29,6 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(program_name, alignment=Qt.AlignCenter)        
 
         main_layout.addLayout(self.create_file_select_layout())
-        main_layout.addLayout(self.create_delimiter_decimal_layout())
 
         self.graph_title = CW.create_line_edit("Graph Title..")
         main_layout.addWidget(self.graph_title)
@@ -60,16 +60,6 @@ class MainWindow(QMainWindow):
         file_select_layout.addWidget(choose_file_button)
 
         return file_select_layout
-    
-    def create_delimiter_decimal_layout(self) -> QHBoxLayout:
-        delimiter_decimal_layout = QHBoxLayout()
-
-        self.delimiter_line_edit = CW.create_line_edit("Delimiter (;)")
-        self.decimal_line_edit = CW.create_line_edit("Decimal (.)")
-        delimiter_decimal_layout.addWidget(self.delimiter_line_edit)
-        delimiter_decimal_layout.addWidget(self.decimal_line_edit)
-
-        return delimiter_decimal_layout
 
     def choose_file_clicked(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -78,13 +68,21 @@ class MainWindow(QMainWindow):
         if file_path:
             self.selected_file_name.setText(file_path)
             
-            # Get delimiter and decimal input values
-            delimiter = self.delimiter_line_edit.text()
-            decimal = self.decimal_line_edit.text()
+            # Auto-detect delimiter and decimal separator
+            with open(file_path, 'r', encoding='utf-8') as f:
+                sample = f.read(2048)
+                sniffer = csv.Sniffer()
+                try:
+                    dialect = sniffer.sniff(sample)
+                    delimiter = dialect.delimiter
+                except csv.Error:
+                    delimiter = ','  # Fallback default
 
-            # Use defaults if inputs are empty
-            delimiter = delimiter if delimiter else ";"
-            decimal = decimal if decimal else "."
+                # Guess decimal: look for which separator appears in numeric-looking data
+                # Heuristic: if more commas than dots in numeric context, assume comma decimal
+                comma_count = sample.count(',')
+                dot_count = sample.count('.')
+                decimal = ',' if comma_count > dot_count else '.'
 
             # Read the CSV file
             self.selected_file = pd.read_csv(
@@ -217,22 +215,27 @@ class MainWindow(QMainWindow):
         plt.show()
 
     def save_single_axis_selection(self):
+        self.configurations.setValue("SelectedFileName", self.selected_file_name.text())
         selected_texts = [item.text() for item in self.left_y_items_list.selectedItems()]
         self.configurations.setValue("SingleSelections", selected_texts)
         self.configurations.setValue("SingleLeftAxisLabel", self.left_y_axis_label_line_edit.text())
 
     def load_single_axis_selection(self):
-        label_text = self.configurations.value("SingleLeftAxisLabel", "")
-        self.left_y_axis_label_line_edit.setText(label_text)
+        if self.selected_file_name.text() == self.configurations.value("SelectedFileName", ""):
+            label_text = self.configurations.value("SingleLeftAxisLabel", "")
+            self.left_y_axis_label_line_edit.setText(label_text)
 
-        selected_texts = self.configurations.value("SingleSelections", [])
-        if isinstance(selected_texts, str):
-            selected_texts = [selected_texts]
+            selected_texts = self.configurations.value("SingleSelections", [])
+            if isinstance(selected_texts, str):
+                selected_texts = [selected_texts]
 
-        for i in range(self.left_y_items_list.count()):
-            item = self.left_y_items_list.item(i)
-            if item.text() in selected_texts:
-                item.setSelected(True)
+            for i in range(self.left_y_items_list.count()):
+                item = self.left_y_items_list.item(i)
+                if item.text() in selected_texts:
+                    item.setSelected(True)
+
+        else:
+            return
 
     def save_dual_axis_selection(self):
         left_selected = [item.text() for item in self.left_y_items_list.selectedItems()]
@@ -268,4 +271,9 @@ class MainWindow(QMainWindow):
                 item.setSelected(True)
 
     def closeEvent(self, event):
+        if self.axis_type_combo.currentIndex() == 0:
+            self.save_single_axis_selection()
+        else:
+            self.save_dual_axis_selection()
+
         event.accept()
