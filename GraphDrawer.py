@@ -126,6 +126,14 @@ class MainWindow(QMainWindow):
         self.left_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
         left_axis_layout.addWidget(self.left_y_items_list)
 
+        select_all_button = CW.create_button('Select All', 'white', 'green', height=30)
+        select_all_button.clicked.connect(partial(self.handle_select_all_click, 'left'))
+        left_axis_layout.addWidget(select_all_button)
+
+        clear_all_button = CW.create_button('Clear All', 'white', 'red', height= 30)
+        clear_all_button.clicked.connect(partial(self.handle_clear_all_click, 'left'))
+        left_axis_layout.addWidget(clear_all_button)
+
         self.axis_dependant_layout.addLayout(left_axis_layout)
 
     def handle_dual_axis_selection(self):
@@ -138,6 +146,14 @@ class MainWindow(QMainWindow):
         self.right_y_items_list = QListWidget()
         self.right_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
         right_axis_layout.addWidget(self.right_y_items_list)
+
+        select_all_button = CW.create_button('Select All', 'white', 'green',height= 30)
+        select_all_button.clicked.connect(partial(self.handle_select_all_click, 'right'))
+        right_axis_layout.addWidget(select_all_button)
+
+        clear_all_button = CW.create_button('Clear All', 'white', 'red', height= 30)
+        clear_all_button.clicked.connect(partial(self.handle_clear_all_click, 'right'))
+        right_axis_layout.addWidget(clear_all_button)
 
         self.axis_dependant_layout.addLayout(right_axis_layout)
 
@@ -208,6 +224,18 @@ class MainWindow(QMainWindow):
 
         fig.suptitle(self.graph_title.text())
         plt.show()
+
+    def handle_select_all_click(self, axis_side: str):
+        if axis_side == 'left':
+            self.left_y_items_list.selectAll()
+        else:
+            self.right_y_items_list.selectAll()
+
+    def handle_clear_all_click(self, axis_side: str):
+        if axis_side == 'left':
+            self.left_y_items_list.clearSelection()
+        else:
+            self.right_y_items_list.clearSelection()
 
     def save_single_axis_selection(self):
         self.configurations.setValue("SelectedFileName", self.selected_file_name.text())
