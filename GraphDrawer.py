@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import csv
+from functools import partial
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QListWidget, QListWidgetItem,
                              QVBoxLayout, QHBoxLayout, QFileDialog, QAbstractItemView)
 from PyQt5.QtCore import QSettings, Qt
@@ -19,7 +20,7 @@ class MainWindow(QMainWindow):
 
     def init_UI(self):
         main_layout = QVBoxLayout()
-        self.axis_dependant_layout = QVBoxLayout()
+        self.axis_dependant_layout = QHBoxLayout()
 
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
@@ -115,36 +116,30 @@ class MainWindow(QMainWindow):
     def handle_single_axis_selection(self):
         '''Change layout when single axis is selected'''
         CW.clear_layout(self.axis_dependant_layout)
+
+        left_axis_layout = QVBoxLayout()
+
+        self.left_y_axis_label_line_edit = CW.create_line_edit("Left Y axis label..")
+        left_axis_layout.addWidget(self.left_y_axis_label_line_edit)
+
         self.left_y_items_list = QListWidget()
         self.left_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.left_y_axis_label_line_edit = CW.create_line_edit("Left Y axis label..")
-        self.axis_dependant_layout.addWidget(self.left_y_items_list)
-        self.axis_dependant_layout.addWidget(self.left_y_axis_label_line_edit)
+        left_axis_layout.addWidget(self.left_y_items_list)
+
+        self.axis_dependant_layout.addLayout(left_axis_layout)
 
     def handle_dual_axis_selection(self):
         '''Change layout when dual axis is selected'''
-        CW.clear_layout(self.axis_dependant_layout)
-
-        dual_axis_layout = QHBoxLayout()
-        left_axis_layout = QVBoxLayout()
         right_axis_layout = QVBoxLayout()
 
-        self.left_y_items_list = QListWidget()
-        self.left_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.left_y_axis_label_line_edit = CW.create_line_edit("Left Y axis label..")
-        left_axis_layout.addWidget(self.left_y_items_list)
-        left_axis_layout.addWidget(self.left_y_axis_label_line_edit)
+        self.right_y_axis_label_line_edit = CW.create_line_edit("Right Y axis label..")
+        right_axis_layout.addWidget(self.right_y_axis_label_line_edit)
 
         self.right_y_items_list = QListWidget()
         self.right_y_items_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.right_y_axis_label_line_edit = CW.create_line_edit("Right Y axis label..")
         right_axis_layout.addWidget(self.right_y_items_list)
-        right_axis_layout.addWidget(self.right_y_axis_label_line_edit)
 
-        dual_axis_layout.addLayout(left_axis_layout)
-        dual_axis_layout.addLayout(right_axis_layout)
-
-        self.axis_dependant_layout.addLayout(dual_axis_layout)
+        self.axis_dependant_layout.addLayout(right_axis_layout)
 
     def populate_items_list(self):
         self.left_y_items_list.clear()
