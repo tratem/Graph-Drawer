@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import csv
 from functools import partial
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QListWidget, QListWidgetItem,
-                             QVBoxLayout, QHBoxLayout, QFileDialog, QAbstractItemView)
+                             QVBoxLayout, QHBoxLayout, QFileDialog, QAbstractItemView,
+                             QInputDialog)
 from PyQt5.QtCore import QSettings, Qt
 from CustomWidgets import custom_widgets as CW
 
@@ -68,8 +69,15 @@ class MainWindow(QMainWindow):
         )
         if file_path:
             self.selected_file_name.setText(file_path)
+
+                    # Ask user for decimal symbol
+            decimal_value, ok = QInputDialog.getText(self, "Decimal Symbol", "Insert decimal symbol (default is .):")
+            if not ok or not decimal_value.strip():
+                decimal = '.'
+            else:
+                decimal = decimal_value.strip()
             
-            # Auto-detect delimiter and decimal separator
+            # Auto-detect delimiter
             with open(file_path, 'r', encoding='utf-8') as f:
                 sample = f.read(2048)
                 sniffer = csv.Sniffer()
@@ -77,13 +85,7 @@ class MainWindow(QMainWindow):
                     dialect = sniffer.sniff(sample)
                     delimiter = dialect.delimiter
                 except csv.Error:
-                    delimiter = ','  # Fallback default
-
-                # Guess decimal: look for which separator appears in numeric-looking data
-                # Heuristic: if more commas than dots in numeric context, assume comma decimal
-                comma_count = sample.count(',')
-                dot_count = sample.count('.')
-                decimal = ',' if comma_count > dot_count else '.'
+                    delimiter = ';'  # Fallback default
 
             # Read the CSV file
             self.selected_file = pd.read_csv(
